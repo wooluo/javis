@@ -1,0 +1,72 @@
+[
+ {
+  "file": "/tmp/wy4_长_t1.wav",
+  "tag": "长",
+  "f0": 78.3,
+  "std": 16.1,
+  "dyn": 29.9,
+  "dur": 9.76,
+  "ok": false,
+  "score": 1.038
+ },
+ {
+  "file": "/tmp/wy4_长_t2.wav",
+  "tag": "长",
+  "f0": 109.9,
+  "std": 33.8,
+  "dyn": 36.0,
+  "dur": 11.84,
+  "ok": true,
+  "score": 0.439
+ },
+ {
+  "file": "/tmp/wy4_长_t3.wav",
+  "tag": "长",
+  "f0": 75.9,
+  "std": 20.2,
+  "dyn": 31.9,
+  "dur": 12.16,
+  "ok": false,
+  "score": 0.982
+ },
+ {
+  "file": "/tmp/wy4_短_t1.wav",
+  "tag": "短",
+  "f0": 129.5,
+  "std": 51.5,
+  "dyn": 32.4,
+  "dur": 7.2,
+  "ok": true,
+  "score": 0.118
+ },
+ {
+  "file": "/tmp/wy4_短_t2.wav",
+  "tag": "短",
+  "f0": 107.6,
+  "std": 38.7,
+  "dyn": 36.7,
+  "dur": 9.44,
+  "ok": true,
+  "score": 0.366
+ },
+ {
+  "file": "/tmp/wy4_短_t3.wav",
+  "tag": "短",
+  "f0": 207.4,
+  "std": 101.3,
+  "dyn": 24.5,
+  "dur": 7.52,
+  "ok": false,
+  "score": 1.655
+ },
+ {
+  "file": "/tmp/wy4_短_t4.wav",
+  "tag": "短",
+  "f0": 98.7,
+  "std": 35.9,
+  "dyn": 30.0,
+  "dur": 7.2,
+  "ok": true,
+  "score": 0.493
+ }
+]

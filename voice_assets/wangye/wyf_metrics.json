@@ -1,0 +1,123 @@
+[
+ {
+  "file": "/tmp/wyf_c1_t1.wav",
+  "tag": "c1",
+  "k": 1,
+  "f0": 137.5,
+  "std": 37.8,
+  "dyn": 25.9,
+  "dur": 5.76,
+  "ok": true,
+  "score": 0.44
+ },
+ {
+  "file": "/tmp/wyf_c2_t1.wav",
+  "tag": "c2",
+  "k": 1,
+  "f0": 130.0,
+  "std": 34.6,
+  "dyn": 28.3,
+  "dur": 8.48,
+  "ok": true,
+  "score": 0.437
+ },
+ {
+  "file": "/tmp/wyf_c3_t1.wav",
+  "tag": "c3",
+  "k": 1,
+  "f0": 156.6,
+  "std": 53.0,
+  "dyn": 35.0,
+  "dur": 8.16,
+  "ok": false,
+  "score": 0.314
+ },
+ {
+  "file": "/tmp/wyf_c3_t2.wav",
+  "tag": "c3",
+  "k": 2,
+  "f0": 114.8,
+  "std": 38.5,
+  "dyn": 30.8,
+  "dur": 9.12,
+  "ok": true,
+  "score": 0.324
+ },
+ {
+  "file": "/tmp/wyf_c4_t1.wav",
+  "tag": "c4",
+  "k": 1,
+  "f0": 103.5,
+  "std": 31.1,
+  "dyn": 28.6,
+  "dur": 7.84,
+  "ok": true,
+  "score": 0.555
+ },
+ {
+  "file": "/tmp/wyf_c5_t1.wav",
+  "tag": "c5",
+  "k": 1,
+  "f0": 97.7,
+  "std": 38.3,
+  "dyn": 37.9,
+  "dur": 7.52,
+  "ok": true,
+  "score": 0.47
+ },
+ {
+  "file": "/tmp/wyf_c6_t1.wav",
+  "tag": "c6",
+  "k": 1,
+  "f0": 68.6,
+  "std": 12.9,
+  "dyn": 30.9,
+  "dur": 8.16,
+  "ok": false,
+  "score": 1.188
+ },
+ {
+  "file": "/tmp/wyf_c6_t2.wav",
+  "tag": "c6",
+  "k": 2,
+  "f0": 117.7,
+  "std": 36.0,
+  "dyn": 31.6,
+  "dur": 7.04,
+  "ok": true,
+  "score": 0.346
+ },
+ {
+  "file": "/tmp/wyf_c7_t1.wav",
+  "tag": "c7",
+  "k": 1,
+  "f0": 120.1,
+  "std": 26.7,
+  "dyn": 33.7,
+  "dur": 6.56,
+  "ok": true,
+  "score": 0.503
+ },
+ {
+  "file": "/tmp/wyf_c8_t1.wav",
+  "tag": "c8",
+  "k": 1,
+  "f0": 78.5,
+  "std": 15.9,
+  "dyn": 27.1,
+  "dur": 5.6,
+  "ok": false,
+  "score": 1.049
+ },
+ {
+  "file": "/tmp/wyf_c8_t2.wav",
+  "tag": "c8",
+  "k": 2,
+  "f0": 117.3,
+  "std": 34.9,
+  "dyn": 28.2,
+  "dur": 4.16,
+  "ok": true,
+  "score": 0.37
+ }
+]

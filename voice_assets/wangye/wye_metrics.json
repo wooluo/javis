@@ -1,0 +1,112 @@
+[
+ {
+  "file": "/tmp/wye_c1_t1.wav",
+  "tag": "c1",
+  "k": 1,
+  "f0": 100.2,
+  "std": 36.2,
+  "dyn": 24.3,
+  "dur": 23.68,
+  "ok": true,
+  "score": 0.488
+ },
+ {
+  "file": "/tmp/wye_c2_t1.wav",
+  "tag": "c2",
+  "k": 1,
+  "f0": 93.2,
+  "std": 22.1,
+  "dyn": 23.3,
+  "dur": 22.56,
+  "ok": true,
+  "score": 0.81
+ },
+ {
+  "file": "/tmp/wye_c3_t1.wav",
+  "tag": "c3",
+  "k": 1,
+  "f0": 110.4,
+  "std": 35.5,
+  "dyn": 24.2,
+  "dur": 15.2,
+  "ok": true,
+  "score": 0.416
+ },
+ {
+  "file": "/tmp/wye_c4_t1.wav",
+  "tag": "c4",
+  "k": 1,
+  "f0": 110.6,
+  "std": 28.1,
+  "dyn": 25.9,
+  "dur": 15.52,
+  "ok": true,
+  "score": 0.553
+ },
+ {
+  "file": "/tmp/wye_c5_t1.wav",
+  "tag": "c5",
+  "k": 1,
+  "f0": 150.0,
+  "std": 77.1,
+  "dyn": 29.4,
+  "dur": 17.44,
+  "ok": true,
+  "score": 0.691
+ },
+ {
+  "file": "/tmp/wye_c6_t1.wav",
+  "tag": "c6",
+  "k": 1,
+  "f0": 82.4,
+  "std": 21.1,
+  "dyn": 31.7,
+  "dur": 11.04,
+  "ok": false,
+  "score": 0.918
+ },
+ {
+  "file": "/tmp/wye_c6_t2.wav",
+  "tag": "c6",
+  "k": 2,
+  "f0": 130.0,
+  "std": 35.8,
+  "dyn": 31.3,
+  "dur": 9.44,
+  "ok": true,
+  "score": 0.413
+ },
+ {
+  "file": "/tmp/wye_c7_t1.wav",
+  "tag": "c7",
+  "k": 1,
+  "f0": 85.5,
+  "std": 17.9,
+  "dyn": 29.8,
+  "dur": 19.68,
+  "ok": false,
+  "score": 0.954
+ },
+ {
+  "file": "/tmp/wye_c7_t2.wav",
+  "tag": "c7",
+  "k": 2,
+  "f0": 146.9,
+  "std": 39.2,
+  "dyn": 25.4,
+  "dur": 15.2,
+  "ok": true,
+  "score": 0.492
+ },
+ {
+  "file": "/tmp/wye_c8_t1.wav",
+  "tag": "c8",
+  "k": 1,
+  "f0": 112.0,
+  "std": 37.4,
+  "dyn": 40.0,
+  "dur": 4.48,
+  "ok": true,
+  "score": 0.368
+ }
+]
