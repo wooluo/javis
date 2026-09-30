@@ -27,3 +27,11 @@ ios/*/Assets.xcassets/AppIcon.appiconset/AppIcon.png
 
 # Xcode 用户态
 xcuserdata/
+
+# 个人音色素材与克隆参考（隐私，绝不入库——edge 后端不读，仅 VoxCPM2 备用）
+personas/*.wav
+personas/*_ref*.txt
+personas/*.bak-*
+configs/*.bak-*
+voxemw/pipeline/*.bak-*
+web/rootCA.pem
