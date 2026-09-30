@@ -7,8 +7,9 @@ label: 王也
 # 长文配方：分块≤50字＋段级F0/字数/时长三重校验自动重抽→拼接→atempo 0.92
 #          →下行扩展器 thr=-24dB ratio=2.5 floor=-65dB→峰值归一（见 voice_assets/wangye/*.py）
 # 实证：《匆匆》8/8、《狼》8/8、复盘 8/8 段全过，终版 F0=118/107/121 贴基线
-ref_wav: personas/wangye_ref.wav
-ref_text: personas/wangye_ref.txt
+# 锚文件在库内路径（personas/*.wav 被 .gitignore 隔离，勿指向 personas/）
+ref_wav: voice_assets/wangye/wy_long48.wav
+ref_text: voice_assets/wangye/wangye_ref.txt
 voice_control: 慵懒散漫的青年男声，语速偏慢，尾音微拖，懒洋洋中带着看透世事的从容与嘲讽
 ---
 
