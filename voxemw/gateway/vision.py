@@ -1,0 +1,117 @@
+"""视觉模块：抓帧 → MiniCPM-V-4.6（OpenAI 兼容边车）→ 场景描述。
+
+形态：VLM 边车（4090 版 = vLLM serve；Mac 存档版 = llama-server），
+本模块负责抓帧和描述调用。帧来源两路：服务器本地摄像头（Mac 的 Swift
+采集器）或浏览器定时上传（4090 版，见 orchestrator /vision/frame）。
+失败一律静默返回 None——视觉是增强，挂了不能拖累对话主链路。
+"""
+
+from __future__ import annotations
+
+import asyncio
+import base64
+import json
+import logging
+import re
+import subprocess
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# 官方模型卡给的工具：模型偶发把换行输出成字面量 \n，渲染前归一化
+# （保护代码块/数学公式里的合法反斜杠序列）
+_LIT_NL_PATTERN = re.compile(
+    r"(```[\s\S]*?```|`[^`]+`|\$\$[\s\S]*?\$\$|\$[^$]+\$"
+    r"|\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\])"
+    r"|(?<!\\)(?:\\r\\n|\\[nr])"
+)
+
+
+def normalize_response_text(text: str) -> str:
+    """字面量 \\n → 真换行（MiniCPM-V 官方建议的输出后处理）。"""
+    if not isinstance(text, str) or "\\" not in text:
+        return text
+    return _LIT_NL_PATTERN.sub(lambda m: m.group(1) or "\n", text)
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+CAPTURE_BIN = REPO_ROOT / "scripts" / "bin" / "camera_capture"
+
+
+class VisionService:
+    """llama-server 视觉边车客户端 + 摄像头采集。"""
+
+    def __init__(self, base_url: str = "http://127.0.0.1:18099",
+                 capture_bin: Path = CAPTURE_BIN,
+                 prompt: str = "用三句以内的中文口语描述这张图片的主要内容（人物、物体、场景），"
+                                "只描述看到的，不评价") -> None:
+        self.base_url = base_url.rstrip("/")
+        self.capture_bin = capture_bin
+        self.prompt = prompt
+        self._client = None
+
+    def _http(self):
+        if self._client is None:
+            import httpx
+            self._client = httpx.AsyncClient(
+                base_url=self.base_url, timeout=30,
+                # 本机地址绕过系统代理（系统代理会把 localhost 劫走 502）
+                trust_env=False)
+        return self._client
+
+    async def available(self) -> bool:
+        try:
+            r = await self._http().get("/health")
+            return r.status_code == 200
+        except Exception:
+            return False
+
+    def _grab_frame(self, out_path: str) -> bool:
+        """同步抓一帧（Swift 采集器）。在 executor 里跑，别阻塞 loop。"""
+        if not self.capture_bin.exists():
+            logger.warning("视觉：采集器不存在 %s", self.capture_bin)
+            return False
+        try:
+            r = subprocess.run([str(self.capture_bin), out_path],
+                               capture_output=True, timeout=15)
+            if r.returncode != 0:
+                logger.warning("视觉：拍照失败 %s", r.stderr.decode(errors="ignore")[:200])
+                return False
+            return Path(out_path).exists()
+        except Exception as e:
+            logger.warning("视觉：拍照异常 %r", e)
+            return False
+
+    async def describe_b64(self, b64: str) -> str | None:
+        """base64 JPEG → 中文场景描述。失败返回 None。"""
+        try:
+            r = await self._http().post("/v1/chat/completions", json={
+                "model": "MiniCPM-V-4.6",
+                "messages": [{"role": "user", "content": [
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+                    {"type": "text", "text": self.prompt},
+                ]}],
+                "max_tokens": 120,
+            })
+            r.raise_for_status()
+            text = r.json()["choices"][0]["message"]["content"].strip()
+            return normalize_response_text(text) or None
+        except Exception as e:
+            logger.warning("视觉：描述失败 %r", e)
+            return None
+
+    async def describe(self, image_path: str) -> str | None:
+        """一张图片 → 中文场景描述。失败返回 None。"""
+        try:
+            b64 = base64.b64encode(Path(image_path).read_bytes()).decode()
+        except Exception as e:
+            logger.warning("视觉：读图失败 %r", e)
+            return None
+        return await self.describe_b64(b64)
+
+    async def look(self) -> str | None:
+        """抓一帧 + 描述，一条龙。失败返回 None。"""
+        frame = "/tmp/vox_vision_frame.jpg"
+        ok = await asyncio.get_running_loop().run_in_executor(None, self._grab_frame, frame)
+        if not ok:
+            return None
+        return await self.describe(frame)

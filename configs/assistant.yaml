@@ -1,0 +1,96 @@
+# VoxEMW 满血版迁移中 —— 目标 4090/24GB（SoulX-FlashHead 数字人 + VoxCPM2 + Qwen3-ASR-1.7B）
+# 当前为过渡态：语音链路 + 眼睛保留，数字人层已拆（VRM/Live2D 见 git tag v1.9.0 存档）
+#
+# 形态：
+# - 纯语音：数字人（AVTR-1）代码已整体拆除，前端静态肖像 + RTC 音频轨
+# - STT/TTS 走 MPS（Apple GPU）；LLM 走 DeepSeek API（key 从 .env.local 读）
+# - RTC：localhost 直连，不需要 coturn/TURN（host candidate 即可）
+#
+# 用法：
+#   bash scripts/start_mac.sh    # pipeline + orchestrator（皆 .venv-mac）
+
+# ---------------------------------------------------------------------------
+# VAD：语音活动检测（Silero，CPU 小模型，与平台无关）
+# ---------------------------------------------------------------------------
+vad:
+  backend: silero
+  min_silence_ms: 64
+
+# ---------------------------------------------------------------------------
+# STT：Qwen3-ASR-0.6B-hf（transformers 原生，bf16 走 MPS；2026-08-23 M5 实测
+# A/B：人设黑话+热词四段满分。自回归，2-5s 短句 0.3-1.0s——用户拍板
+# 用每轮 ~0.5s 换准确率）。
+# hotwords：人设词表，经 chat-template system 注入（"Vocabulary: ..."）。
+# ---------------------------------------------------------------------------
+stt:
+  backend: qwen3asr
+  model_name: Qwen/Qwen3-ASR-0.6B-hf
+  device: auto                  # device_map=auto → MPS
+  language: Chinese
+  # 热词偏置（概率性，务必克制：词越多模型越容易把没说的话脑补成词表内容——
+  # 2026-08-23 实测 10 个词时整段幻觉出词表。只留人设核心词 + corrections 兜底）
+  hotwords: [魔镜女巫, 魔镜]
+  # 确定性后校正（转写后直接替换）：同音误写的兜底修复
+  corrections: {}
+
+# ---------------------------------------------------------------------------
+# LLM：DeepSeek API（deepseek-v4-flash，key 放 .env.local 的
+# DEEPSEEK_API_KEY）。本地 8B 脑实测回复质量不达标，已彻底弃用并删除。
+# ---------------------------------------------------------------------------
+llm:
+  backend: chat-completions
+  model_name: deepseek-v4-flash
+  base_url: https://api.deepseek.com
+  api_key_env: DEEPSEEK_API_KEY
+  stream: true
+  stream_batch_sentences: 1
+  chat_size: 30
+  reasoning_effort: "none"   # 关思考模式（deepseek-v4-flash 默认思考，先想 ~2s 才开口）
+
+# ---------------------------------------------------------------------------
+# TTS：Qwen3-TTS（上游内置后端，Mac 自动走 mlx-audio）。
+# Base 变体 = 零样本音色克隆（良子 ref.wav + ref.txt 由启动参数注入）；
+# Apple Silicon 自动映射到 mlx-community 6bit 版（~2G）。
+# ---------------------------------------------------------------------------
+tts:
+  backend: qwen3                                 # 上游注册名（CLI 选项是 --tts qwen3）
+  model_name: Qwen/Qwen3-TTS-12Hz-1.7B-Base   # Base=克隆；CustomVoice=预设音色
+  device: auto                                 # darwin 上自动选 mlx-audio
+  # mlx_quantization: bf16  # 别升：实测 TTFA 翻倍且生成跟不上播放（内存带宽 2.6x）
+  sample_rate: 16000                           # 管线全程 16kHz，勿改
+
+# ---------------------------------------------------------------------------
+# WebRTC 音频轨：本地 localhost 直连（host candidate），无需 coturn/TURN
+# ---------------------------------------------------------------------------
+rtc:
+  enabled: true
+  browser_ice_servers: []
+
+# ---------------------------------------------------------------------------
+# 视觉（魔镜女巫的眼睛）：llama-server 边车跑 MiniCPM-V-4.6（GGUF + mmproj，
+# 见 scripts/start_mac.sh 的 VLM 段）。DeepSeek 调 look_at_camera 工具时
+# 取最新浏览器帧描述注入
+# ---------------------------------------------------------------------------
+vision:
+  enabled: true
+  vlm_url: http://127.0.0.1:18099
+
+# ---------------------------------------------------------------------------
+# 人设注册表（魔镜女巫唯一）
+# ---------------------------------------------------------------------------
+personas:
+  default: mojingnvwu
+  list:
+    mojingnvwu: personas/mojingnvwu.md
+
+# ---------------------------------------------------------------------------
+# 服务参数
+# ---------------------------------------------------------------------------
+server:
+  s2s_host: 127.0.0.1
+  s2s_port: 8765
+  host: 127.0.0.1              # 本地版只绑回环
+  port: 8000
+  log_level: info
+  enable_live_transcription: false
+  num_pipelines: 1

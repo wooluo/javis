@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- iPad 全屏:加到主屏幕后独立打开,无地址栏;状态栏随页面底色 -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#081120" />
+  <title>智能管家</title>
+  <link rel="stylesheet" href="/static/style.css?v=20260927l" />
+</head>
+<body>
+  <canvas id="space"></canvas>
+  <main class="stage">
+    <header class="topbar">
+      <h1>智能管家</h1>
+      <div class="topbar-right">
+        <span id="status" class="status">未连接</span>
+      </div>
+    </header>
+
+    <nav id="persona-bar" class="persona-bar" aria-label="人设切换"></nav>
+
+    <section class="avatar-stage" id="avatar-stage" hidden>
+      <div class="magic-mirror" id="magic-mirror">
+        <canvas id="avatar-canvas" width="512" height="512"></canvas>
+        <div class="water-mirror">
+          <video id="cam-preview" muted playsinline hidden></video>
+        </div>
+      </div>
+    </section>
+
+    <section class="transcript" id="transcript" aria-live="polite">
+      <p class="empty-hint" id="empty-hint">说点什么吧…</p>
+    </section>
+
+    <p class="caption" id="caption"></p>
+
+    <footer class="controls">
+      <button id="mode-btn" class="mode-btn" title="切换粒子模式">✨</button>
+      <div class="orb" id="orb">
+        <button id="mic-btn" class="mic-btn" disabled aria-label="开始对话">🎙</button>
+      </div>
+      <p class="hint">点一下唤醒贾维斯，随时可以打断他 · 智能管家</p>
+    </footer>
+  </main>
+  <script src="/static/assistant.js?v=20260927l"></script>
+</body>
+</html>

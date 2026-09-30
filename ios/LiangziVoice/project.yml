@@ -1,0 +1,25 @@
+name: LiangziVoice
+options:
+  bundleIdPrefix: studio.emw
+targets:
+  LiangziVoice:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources: [Sources, Assets.xcassets]
+    info:
+      path: Info.plist
+      properties:
+        UILaunchScreen: {}
+        CFBundleDisplayName: "VoxEMW"
+        NSMicrophoneUsageDescription: "良子语音助手需要麦克风来和你语音对话。"
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: studio.emw.liangzivoice
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # 真机侧载：在 Xcode 的 Signing & Capabilities 里选你自己的 Team 即可
+        CODE_SIGN_STYLE: Automatic
