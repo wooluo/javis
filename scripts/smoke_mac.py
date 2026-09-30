@@ -54,7 +54,11 @@ async def smoke_text(question: str) -> bool:
             if state["first_audio"] is None:
                 state["first_audio"] = time.time() - t0
         elif ty == "response.done":
-            return "done"
+            # 工具回合（如 run_zcode）的第一轮 response.done 不带文本/音频——
+            # 只有真正拿到助手产出才算完，否则继续等工具回注后的最终回复
+            if state.get("first_text") is not None or state.get("first_audio") is not None:
+                return "done"
+            return None
         elif ty == "error":
             print("ERROR:", json.dumps(msg, ensure_ascii=False)[:300])
             return "done"
@@ -107,7 +111,11 @@ async def smoke_wav(wav_path: str, expect: str | None) -> bool:
             if state["first_audio"] is None:
                 state["first_audio"] = time.time() - t0
         elif ty == "response.done":
-            return "done"
+            # 工具回合（如 run_zcode）的第一轮 response.done 不带文本/音频——
+            # 只有真正拿到助手产出才算完，否则继续等工具回注后的最终回复
+            if state.get("first_text") is not None or state.get("first_audio") is not None:
+                return "done"
+            return None
         elif ty == "error":
             print("ERROR:", json.dumps(msg, ensure_ascii=False)[:300])
             return "done"

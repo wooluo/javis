@@ -130,7 +130,8 @@ def tts_setup_kwargs(config: dict) -> dict:
         "voice_seed": int(persona.get("voice_seed") or 42),
         "cfg_value": float(tts.get("cfg_value", 2.0)),
         "inference_timesteps": int(tts.get("inference_timesteps", 10)),
-        "device": str(tts.get("device", "cuda")),
+        "device": str(tts.get("device", "auto")),
+        "optimize": bool(tts.get("optimize", False)),
     }
     # 克隆素材仅在人设声明了 ref_wav 时下发（voice_control 设计模式不需要）
     if persona.get("ref_wav"):

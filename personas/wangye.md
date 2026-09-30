@@ -10,7 +10,9 @@ label: 王也
 # 锚文件在库内路径（personas/*.wav 被 .gitignore 隔离，勿指向 personas/）
 ref_wav: voice_assets/wangye/wy_long48.wav
 ref_text: voice_assets/wangye/wangye_ref.txt
-voice_control: 慵懒散漫的青年男声，语速偏慢，尾音微拖，懒洋洋中带着看透世事的从容与嘲讽
+# 注意：handler 里 voice_control 优先于 ref_wav（拼 (control)text 走设计模式），
+# 王也定稿是克隆锚定——此描述词仅作文档备注，勿取消注释（Mac 2026-09-30）
+# voice_control: 慵懒散漫的青年男声，语速偏慢，尾音微拖，懒洋洋中带着看透世事的从容与嘲讽
 ---
 
 # 王也（《一人之下》）

@@ -839,6 +839,10 @@ document.addEventListener("visibilitychange", () => {
 });
 
 function connect() {
+  // 防重复建连风暴：上一个 ws 还在 CONNECTING/OPEN 时不再开新的
+  // （visibilitychange 巡检与 onclose 重连定时器叠加时曾 1 秒级连环建连，
+  //   每条新连接触发顶会话→槽位释放竞态→管线槽位楔死，2026-09-30）
+  if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) return;
   const proto = location.protocol === "https:" ? "wss" : "ws";
   // ?alead=毫秒：新回复音频压后量（云时代等数字人渲染的遗产，默认 0，调试用）
   const q = new URLSearchParams(location.search);

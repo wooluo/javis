@@ -3,7 +3,9 @@
 # 台式机原版：set -a; source /home/wooluo/voxemw-deploy/voxemw-app/.env.local; set +a
 set -a; source "$(dirname "$0")/.env.local"; set +a
 # HF 缓存离线模式（模型全量落地后开启；首次部署需联网下载，先注释掉这行）
-# export HF_HUB_OFFLINE=1
+# 2026-09-30：smart-turn 启动 etag 检查会走 macOS 系统代理（7890）偶发挂死，
+# 模型已全部本地化，钉死离线
+export HF_HUB_OFFLINE=1
 # 清空代理（socks/http 代理会劫持 httpx；GLM 直连不需要代理）
 unset ALL_PROXY all_proxy HTTPS_PROXY https_proxy HTTP_PROXY http_proxy
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"

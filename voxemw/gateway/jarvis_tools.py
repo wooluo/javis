@@ -1,18 +1,21 @@
 # -*- coding: utf-8 -*-
-"""贾维斯工具层：天气 / 股票快照 / K线历史 / Hermes 全技能桥。
+"""贾维斯工具层：天气 / 股票快照 / K线历史 / ZCode 编码代理 / Hermes 全技能桥。
 
 设计原则（照抄 look_at_camera 模式）：
 - 工具是增强，挂了不能拖累对话主链路——所有异常静默兜底。
 - 全部异步（run_in_executor 包阻塞 IO），不卡 orchestrator 事件循环。
-- 慢工具（hermes）超时回"后台办理中"话术，不吊死会话。
+- 慢工具（zcode/hermes）超时回"后台办理中"话术，不吊死会话。
 
 数据源：
 - 天气：wttr.in 免费无 key（Open-Meteo 备胎）。
 - 股票快照：腾讯 qt.gtimg.cn（记忆约定：外网请求绕开 clash 代理）。
 - K线历史：本地缓存 ~/oddindicators/data/klines_cache/*.json
   （5367 只全量历史，股票名→代码映射 pickle 常驻）。
+- ZCode：`zcode.cjs -p "<task>" --cwd <dir>` 无头模式——编码/修 bug/
+  文件操作/跑命令/Git 等开发类任务的专属通道，超时转后台继续跑，
+  check_zcode 可查进度与结果（日志落盘 logs/zcode_jobs/）。
 - Hermes：`hermes -z "<prompt>"` 无头模式，贾维斯自然语言点菜 →
-  Hermes 带全部本地技能干活 → 返回结论。
+  Hermes 带全部本地技能干活 → 返回结论（查资料/分析等非开发类杂务）。
 """
 
 from __future__ import annotations
@@ -86,12 +89,53 @@ JARVIS_TOOLS: list[dict] = [
     },
     {
         "type": "function",
+        "name": "run_zcode",
+        "description": (
+            "编码代理：把写代码、改bug、重构、建项目、文件读写、整理目录、"
+            "跑shell命令、Git操作等一切开发/文件/命令类任务交给 ZCode（本机"
+            "顶级AI编程代理，可直接读写指定目录文件、执行命令、多步完成）。"
+            "task 必须自包含完整（含绝对路径、语言、验收标准），ZCode 拿到"
+            "即可独立开工。耗时30秒到几分钟；超时会自动转后台继续办理，"
+            "届时告知用户稍后用 check_zcode 查询，不许假装已完成。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "string",
+                    "description": "完整任务描述：做什么、在哪个目录、语言/框架、验收标准",
+                },
+                "workdir": {
+                    "type": "string",
+                    "description": "工作目录绝对路径，默认用户主目录 ~",
+                },
+            },
+            "required": ["task"],
+        },
+    },
+    {
+        "type": "function",
+        "name": "check_zcode",
+        "description": (
+            "查询 run_zcode 派出的后台任务进度：仍在跑 / 已完成（附结果）。"
+            "用户回来问「那个活儿好了没」「办得怎么样了」时调用。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "job_id": {"type": "string", "description": "run_zcode 返回的任务号，如 zc-3"},
+            },
+            "required": ["job_id"],
+        },
+    },
+    {
+        "type": "function",
         "name": "ask_hermes",
         "description": (
-            "万能后台：把任务交给 Hermes（本机全能AI助手，具备200+技能："
-            "查资料、深度分析、回测、写代码、文件操作、发消息、订提醒等）。"
-            "天气和股票查询之外的一切事务都交给它。返回最终答复文本。"
-            "耗时可能10-60秒。"
+            "杂务后台：把非开发类的杂务交给 Hermes（本机全能AI助手，200+技能："
+            "查资料、深度分析、写作翻译、订提醒、发消息等）。"
+            "注意：编码/文件操作/跑命令/Git 一律走 run_zcode，天气走 get_weather，"
+            "股票走 get_stock_quote。返回最终答复文本，耗时10-60秒。"
         ),
         "parameters": {
             "type": "object",
@@ -447,6 +491,102 @@ async def ask_hermes(task: str) -> str:
         return "（Hermes 线路故障）"
 
 
+# ── ZCode 编码代理（无头 -p 模式）────────────────────
+_NODE_BIN = os.path.expanduser("~/.nvm/versions/node/v22.16.0/bin/node")
+_ZCODE_CJS = "/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs"
+_ZCODE_SYNC_TIMEOUT_S = 300          # 同步等待上限；超时转后台继续跑
+_ZCODE_TAIL_CHARS = 3500             # 回注给 LLM 的结果尾部长度
+_ZCODE_JOBS_DIR = Path(__file__).resolve().parents[2] / "logs" / "zcode_jobs"
+_ZCODE_JOBS: dict[str, dict] = {}    # job_id -> {proc, task, log, started}
+_ZCODE_SEQ = 0
+
+
+def _zcode_available() -> bool:
+    return os.path.isfile(_ZCODE_CJS) and os.path.isfile(_NODE_BIN)
+
+
+def _log_tail(path: Path, chars: int) -> str:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        return text[-chars:].strip()
+    except Exception:
+        return ""
+
+
+async def run_zcode(task: str, workdir: str = "") -> str:
+    """ZCode 无头执行。stdout 落盘（防 PIPE 缓冲区死锁），300s 内完成直接
+    回结果；超时不杀进程、转后台登记，用 check_zcode 查。"""
+    global _ZCODE_SEQ
+    if not _zcode_available():
+        return "（ZCode CLI 不在本机预期路径，无法执行开发任务）"
+    task = (task or "").strip()
+    if not task:
+        return "（任务描述为空）"
+    wd = os.path.expanduser(workdir.strip() or "~")
+    if not os.path.isdir(wd):
+        return f"（工作目录不存在: {wd}）"
+
+    _ZCODE_SEQ += 1
+    job_id = f"zc-{_ZCODE_SEQ}"
+    _ZCODE_JOBS_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = _ZCODE_JOBS_DIR / f"{job_id}.log"
+
+    prompt = f"{task}\n\n（完成后用一小段中文汇报：做了什么、结果如何、关键文件路径）"
+    env = dict(os.environ, NO_COLOR="1")
+    try:
+        with open(log_path, "w", encoding="utf-8") as lf:
+            proc = await asyncio.create_subprocess_exec(
+                _NODE_BIN, _ZCODE_CJS, "-p", prompt, "--cwd", wd,
+                stdout=lf, stderr=asyncio.subprocess.STDOUT,
+                cwd=wd, env=env,
+            )
+    except Exception as e:
+        logger.info("run_zcode 启动失败: %s", e)
+        return "（ZCode 启动失败，已记录）"
+
+    _ZCODE_JOBS[job_id] = {
+        "proc": proc, "task": task, "log": log_path,
+        "started": asyncio.get_running_loop().time(),
+    }
+    try:
+        await asyncio.wait_for(proc.wait(), timeout=_ZCODE_SYNC_TIMEOUT_S)
+    except asyncio.TimeoutError:
+        asyncio.create_task(proc.wait())  # 孤儿收尸，防僵尸
+        logger.info("run_zcode 转后台 %s (pid=%s): %s", job_id, proc.pid, task[:60])
+        return (
+            f"（任务 {job_id} 较重，ZCode 已转后台继续办理，进程仍在跑。"
+            f"请如实告知用户：已派后台办理，稍后问「{job_id} 好了没」可查进度）"
+        )
+
+    out = _log_tail(log_path, _ZCODE_TAIL_CHARS)
+    logger.info("run_zcode %s 完成 rc=%s 耗时~%ds: %s",
+                job_id, proc.returncode,
+                int(asyncio.get_running_loop().time() - _ZCODE_JOBS[job_id]["started"]),
+                task[:60])
+    if proc.returncode != 0:
+        return f"（ZCode 退出码 {proc.returncode}，日志尾部：\n{out or '(无输出)'}）"
+    return out or "（ZCode 正常结束但没有输出）"
+
+
+async def check_zcode(job_id: str) -> str:
+    job = _ZCODE_JOBS.get((job_id or "").strip())
+    if job is None:
+        # 编排器重启后内存表丢失，磁盘日志还在——按号读档兜底
+        log_path = _ZCODE_JOBS_DIR / f"{(job_id or '').strip()}.log"
+        if (job_id or "").strip().startswith("zc-") and log_path.is_file():
+            return f"（任务 {job_id.strip()} 的日志存档：\n{_log_tail(log_path, _ZCODE_TAIL_CHARS)}）"
+        return "（没有这个任务号；注意编排器重启后只能查日志存档）"
+    proc = job["proc"]
+    elapsed = int(asyncio.get_running_loop().time() - job["started"])
+    if proc.returncode is None:
+        return (
+            f"（任务 {job_id} 仍在后台运行（已 {elapsed} 秒），任务：{job['task'][:80]}。"
+            f"请告知用户还在办，稍后再查）"
+        )
+    out = _log_tail(job["log"], _ZCODE_TAIL_CHARS)
+    return f"（任务 {job_id} 已完成（共 {elapsed} 秒，退出码 {proc.returncode}）。结果：\n{out}）"
+
+
 async def execute_tool(name: str, arguments: dict) -> str:
     """统一入口：按名分发。异常兜底文案，绝不抛出。"""
     try:
@@ -460,6 +600,12 @@ async def execute_tool(name: str, arguments: dict) -> str:
             )
         if name == "ask_hermes":
             return await ask_hermes(arguments.get("task", ""))
+        if name == "run_zcode":
+            return await run_zcode(
+                arguments.get("task", ""), arguments.get("workdir", "")
+            )
+        if name == "check_zcode":
+            return await check_zcode(arguments.get("job_id", ""))
         return f"（未知工具 {name}）"
     except Exception as e:
         logger.info("工具 %s 执行异常: %s", name, e)

@@ -97,7 +97,8 @@ class VoxCPM2TTSHandler(BaseHandler):
         voice_seed: int = 42,
         cfg_value: float = 2.0,
         inference_timesteps: int = 10,
-        device: str = "cuda",
+        device: str = "auto",   # auto=包内自动(CUDA→MPS→CPU)；可显式 mps/cpu
+        optimize: bool = False,  # torch.compile：MPS 上预热慢且收益不稳，Mac 默认关
         blocksize: int = 512,
         cancel_scope=None,
         speculative_turns=None,
@@ -117,11 +118,16 @@ class VoxCPM2TTSHandler(BaseHandler):
         self.cfg_value = cfg_value
         self.inference_timesteps = inference_timesteps
 
-        logger.info("加载 VoxCPM2: %s (device=%s, 模式=%s)", model_name, device,
-                    "音色设计" if self.voice_control else "零样本克隆")
+        logger.info("加载 VoxCPM2: %s (device=%s, optimize=%s, 模式=%s)", model_name, device,
+                    optimize, "音色设计" if self.voice_control else "零样本克隆")
         t0 = time.perf_counter()
-        self.model = VoxCPM.from_pretrained(model_name, load_denoiser=False)
-        logger.info("VoxCPM2 加载完成 %.1fs", time.perf_counter() - t0)
+        self.model = VoxCPM.from_pretrained(
+            model_name, load_denoiser=False,
+            device=None if device in ("auto", "") else device,
+            optimize=optimize,
+        )
+        logger.info("VoxCPM2 加载完成 %.1fs (实际 device=%s)", time.perf_counter() - t0,
+                    getattr(getattr(self.model, "tts_model", None), "device", "?"))
 
         # 提速改造: setup 一次性固化 prompt_cache(读wav+VAE encode)，
         # process 不再每次重 build（每句省 ~0.5-1s）
@@ -236,7 +242,11 @@ class VoxCPM2TTSHandler(BaseHandler):
                 chunk = chunk[0]
             if self.cancel_scope is not None and self.cancel_scope.discarding:
                 break  # 打断：本轮输出已被废弃
-            pcm = self._to_pipeline_pcm(self._norm.process(chunk))
+            # -6dB 头部空间：模型原始输出峰值即 ~0.99（零余量），归一器对静音段
+            # 最高 +6dB 增益会把响亮音节推出 ±1.0 硬削波（破音，2026-09-30 实测
+            # 10/40 步各削 ~1300 样本）。先垫余量，归一器再按 RMS 目标补回，
+            # 响度不变、峰值受控
+            pcm = self._to_pipeline_pcm(self._norm.process(np.asarray(chunk) * 0.5))
             if not pcm:
                 continue
             n_samples += len(pcm) // 2

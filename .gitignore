@@ -35,3 +35,7 @@ personas/*.bak-*
 configs/*.bak-*
 voxemw/pipeline/*.bak-*
 web/rootCA.pem
+
+# Mac 部署产物（2026-09-30）：venv 与本地模型目录绝不入库
+main-env/
+models/

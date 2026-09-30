@@ -202,16 +202,17 @@ body {
 }
 
 /* ── 主角光环按钮（紫水晶球）── */
+/* 三列网格：中列自适应、两侧各占 1fr——麦克风严格贴页面中线
+   （旧 flex 把 [模式按钮+麦克风] 整体居中，麦克风被挤偏 ~24px，2026-09-30 修） */
 .controls {
-  display: flex;
-  flex-direction: row;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: center;
-  gap: 14px;
+  row-gap: 6px;
   padding-top: 4px;
-  flex-wrap: wrap;
-  text-align: center;
 }
+.mode-btn { grid-column: 1; justify-self: start; }
+.orb { grid-column: 2; grid-row: 1; }
 
 .orb {
   position: relative;
@@ -460,9 +461,8 @@ body {
 
 /* ────────── 模式切换按钮 + 粒子模式（2026-09-27d，09-27i 移至底部） ────────── */
 .topbar-right { display: flex; align-items: center; gap: 8px; }
-.controls .hint { flex: 1 0 100%; margin: 0; }
+.controls .hint { grid-column: 1 / -1; grid-row: 2; margin: 0; text-align: center; }
 .mode-btn {
-  flex: 0 0 auto;
   width: 34px;
   height: 34px;
   border-radius: 50%;

@@ -66,6 +66,100 @@ def _patch_torch_hub_offline_fallback() -> None:
     torch.hub.load = _load_with_local_fallback
 
 
+def _patch_llm_channel_strip() -> None:
+    """LM Studio gemma 模板在工具回合后会把思维通道头原样漏进 content
+    （实测 2026-09-30：'<|channel>thought\\n<channel|>' + 正文；chat_template_kwargs
+    enable_thinking=false 服务端无视）。在 TextDelta 产生点包一层有状态过滤：
+    剥完整 thought 段（含思维内容）与一切通道标记变体，跨 delta 截断的标记
+    尾巴扣住待下一片拼接，杜绝 TTS 把壳念出来。"""
+    import re
+
+    from speech_to_speech.LLM import chat_completions_language_model as cc
+
+    # 完整 thought 段：<|channel>thought …（思维内容）…<|channel|>final → 连 final 标签一并剥
+    thought_re = re.compile(
+        r"<\|?channel\|?>\s*thought[\s\S]*?<\|?channel\|?>\s*(final)?", re.IGNORECASE)
+    # 未闭合的 thought 开头（闭标记还没流到 → 整段扣住，防思维内容漏出）
+    open_re = re.compile(r"<\|?channel\|?>\s*thought", re.IGNORECASE)
+    # 一切残留标记变体（channel/message/end/system，正反斜杠混排的 malformed 也算）
+    marker_re = re.compile(r"<\|?[a-z]+\|?>", re.IGNORECASE)
+    # 回合开头的裸 thought 引导词（标记先被剥掉/服务端已滤时，只剩单词——
+    # 2026-09-30 实测流式下 <|channel> 与 thought 分包到达就会这样）
+    lead_re = re.compile(r"^thought(?=$|[\s\n])", re.IGNORECASE)
+    # 流式截断防护：结尾像「未闭合标记开头」或「thought 撕开的半截」的片段扣住
+    tail_re = re.compile(r"<[a-z|]*$|t(?:h(?:o(?:u(?:g(?:h(?:t)?)?)?)?)?)?$", re.IGNORECASE)
+
+    class _Filter:
+        def __init__(self):
+            self.buf = ""
+            self.started = False  # 回合开头才需要识别 thought 引导词
+
+        def _strip_head(self):
+            """回合开头：剥标记 → 剥裸 thought 引导词。返回是否仍需扣住。"""
+            self.buf = thought_re.sub("", self.buf, count=1)
+            if open_re.search(self.buf):
+                return True  # 未闭合 thought 段：全扣
+            self.buf = marker_re.sub("", self.buf)
+            self.buf = lead_re.sub("", self.buf, count=1)
+            return False
+
+        def feed(self, text):
+            self.buf += text
+            if not self.started:
+                held = self._strip_head()
+                if held:
+                    return ""  # 未闭合 thought 段：全扣等闭标记
+                self.buf = self.buf.lstrip("\n\r \t")  # 引导词剥后的残余换行
+                if not self.buf:
+                    return ""  # 开头全是壳/引导词，等内容
+            else:
+                self.buf = thought_re.sub("", self.buf, count=1)
+                if open_re.search(self.buf):
+                    return ""
+                self.buf = marker_re.sub("", self.buf)
+            m = tail_re.search(self.buf)
+            if m:
+                out, self.buf = self.buf[: m.start()], m.group(0)
+            else:
+                out, self.buf = self.buf, ""
+            if out.strip():
+                self.started = True
+            elif not self.started:
+                out = ""  # 开场纯空白（thought 剥后残余换行等）：吞掉
+            return out
+
+        def flush(self):
+            out, self.buf = self.buf, ""
+            if not self.started:
+                return ""  # 开场扣住的全是壳/引导词/未闭合思维：整体丢弃
+            m = open_re.search(out)
+            if m:
+                out = out[: m.start()]  # 流结束仍未闭合的 thought 段：从开口处丢弃
+            out = marker_re.sub("", out)
+            out = re.sub(r"<[a-z|]*$", "", out)  # 尾部残缺标记片段
+            return out
+
+    def _wrap(orig):
+        def _iter(api_response):
+            f = _Filter()
+            for ev in orig(api_response):
+                text = getattr(ev, "text", None)
+                if isinstance(text, str) and text:
+                    ev.text = f.feed(text)
+                    if ev.text:
+                        yield ev
+                    # 清洗后暂空（扣住的截断尾巴/未闭合段）：吞掉本片等内容到齐
+                else:
+                    yield ev
+            tail = f.flush()
+            if tail:
+                yield cc.TextDelta(text=tail)
+        return _iter
+
+    cc._iter_chat_stream_events = _wrap(cc._iter_chat_stream_events)
+    cc._iter_chat_response_events = _wrap(cc._iter_chat_response_events)
+
+
 def _patch_smart_turn_gpu() -> None:
     """上游 SmartTurnAnalyzer 硬编 CPUExecutionProvider。smart_turn_model_path 指到
     *-gpu.onnx 且 CUDA 可用时换成 GPU 优先（复核 ~80ms → ~10ms）。
@@ -149,6 +243,7 @@ def main() -> None:
     _patch_torch_flex_attention_compat()
     _patch_torch_hub_offline_fallback()
     _patch_smart_turn_gpu()
+    _patch_llm_channel_strip()
 
     # 新上游标准 serve 流程（s2s_pipeline.run_pipeline_command 复刻）
     parsed = s2s.parse_arguments(argv, command="serve")
